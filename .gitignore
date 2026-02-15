@@ -19,8 +19,9 @@ build/
 *.h5
 *.hdf5
 
-# Images (generated)
+# Images (generated, except results/)
 *.png
+!results/*.png
 
 # Environment
 .env
