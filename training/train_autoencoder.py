@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
-from ..models.autoencoder import SparsityRegularizedAE
+from models.autoencoder import SparsityRegularizedAE
 from .jacobian_utils import stochastic_jacobian_l1
 
 

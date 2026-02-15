@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 from tqdm import tqdm
 
-from ..utils.memory import clear_gpu_memory
+from utils.memory import clear_gpu_memory
 
 
 def precompute_reference_embeddings(metadata, tokenizer, embed_layer, config):

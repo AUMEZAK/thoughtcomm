@@ -12,9 +12,9 @@ from tqdm import tqdm
 
 from .debate import MultiAgentDebate
 from .agreement import AgreementReweighter
-from ..models.autoencoder import SparsityRegularizedAE
-from ..models.prefix_adapter import PrefixAdapter
-from ..utils.memory import clear_gpu_memory
+from models.autoencoder import SparsityRegularizedAE
+from models.prefix_adapter import PrefixAdapter
+from utils.memory import clear_gpu_memory
 
 
 class ThoughtCommPipeline:
@@ -129,7 +129,7 @@ def run_single_answer_baseline(model, tokenizer, eval_data, config,
     Returns:
         responses: list of str (one per example)
     """
-    from ..utils.prompts import INITIAL_PROMPT
+    from utils.prompts import INITIAL_PROMPT
 
     responses = []
     device = next(model.parameters()).device

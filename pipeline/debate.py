@@ -5,9 +5,9 @@ Uses a single model instance, running agents sequentially to save GPU memory.
 """
 
 import torch
-from ..utils.prompts import INITIAL_PROMPT, DEBATE_PROMPT, format_other_responses
-from ..utils.memory import clear_gpu_memory
-from ..models.model_utils import extract_last_hidden_state
+from utils.prompts import INITIAL_PROMPT, DEBATE_PROMPT, format_other_responses
+from utils.memory import clear_gpu_memory
+from models.model_utils import extract_last_hidden_state
 
 
 class MultiAgentDebate:

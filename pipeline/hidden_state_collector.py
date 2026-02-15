@@ -7,7 +7,7 @@ from all agents at each round, and saves checkpoints.
 import os
 import torch
 from tqdm import tqdm
-from ..utils.memory import clear_gpu_memory, print_memory_stats
+from utils.memory import clear_gpu_memory, print_memory_stats
 
 
 class HiddenStateCollector:
