@@ -76,13 +76,14 @@ class StructuredInvertibleMLP(nn.Module):
         return torch.cat([x_a, x_b], dim=1)
 
 
-def generate_synthetic_data(dim=128, num_samples=10000, seed=42):
+def generate_synthetic_data(dim=128, num_samples=10000, seed=42, num_layers=1):
     """Generate synthetic data with known latent structure.
 
     Args:
         dim: total dimensionality (latent and observed use same dim)
         num_samples: number of data points
         seed: random seed
+        num_layers: number of layers in mixing MLP (1=linear, 3=nonlinear)
 
     Returns:
         X: (num_samples, dim) observed variables
@@ -116,7 +117,8 @@ def generate_synthetic_data(dim=128, num_samples=10000, seed=42):
 
     # Build structured mixing function
     mixing_fn = StructuredInvertibleMLP(
-        dim, n_private_a, n_shared, n_private_b, n_obs_a, n_obs_b, seed=seed
+        dim, n_private_a, n_shared, n_private_b, n_obs_a, n_obs_b,
+        num_layers=num_layers, seed=seed
     )
     mixing_fn.eval()
 

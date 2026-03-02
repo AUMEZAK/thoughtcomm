@@ -33,6 +33,13 @@ class SparsityRegularizedAE(nn.Module):
         self.encoder = self._build_network(n_h, n_z, hidden_dim, num_layers)
         self.decoder = self._build_network(n_z, n_h, hidden_dim, num_layers)
 
+        # Normalization buffers (set after training via set_norm_stats).
+        # encode() auto-normalizes raw inputs when _has_norm is True.
+        # During training _has_norm is False so pre-normalized data passes through.
+        self.register_buffer('_norm_mean', torch.zeros(n_h))
+        self.register_buffer('_norm_std', torch.ones(n_h))
+        self.register_buffer('_has_norm', torch.tensor(False))
+
     def _build_network(self, in_dim, out_dim, hidden_dim, num_layers):
         layers = []
         dims = [in_dim] + [hidden_dim] * (num_layers - 1) + [out_dim]
@@ -42,16 +49,38 @@ class SparsityRegularizedAE(nn.Module):
                 layers.append(nn.LeakyReLU(0.2))
         return nn.Sequential(*layers)
 
+    def set_norm_stats(self, mean: torch.Tensor, std: torch.Tensor):
+        """Set normalization statistics after training.
+
+        Once set, encode() will auto-normalize raw hidden state inputs.
+        Stats are persisted in state_dict for checkpoint loading.
+
+        Args:
+            mean: (n_h,) per-dimension mean of training hidden states
+            std: (n_h,) per-dimension std of training hidden states
+        """
+        self._norm_mean.copy_(mean.detach())
+        self._norm_std.copy_(std.detach().clamp(min=1e-8))
+        self._has_norm.fill_(True)
+
+    def _normalize(self, H: torch.Tensor) -> torch.Tensor:
+        """Normalize input if norm_stats have been set."""
+        if self._has_norm:
+            return (H - self._norm_mean.to(H.device)) / self._norm_std.to(H.device)
+        return H
+
     def encode(self, H: torch.Tensor) -> torch.Tensor:
         """Encode hidden states to latent thoughts.
 
+        Auto-normalizes if norm_stats have been set via set_norm_stats().
+
         Args:
-            H: (batch, n_h) concatenated hidden states
+            H: (batch, n_h) concatenated hidden states (raw or pre-normalized)
 
         Returns:
             Z_hat: (batch, n_z) latent thoughts
         """
-        return self.encoder(H)
+        return self.encoder(self._normalize(H))
 
     def decode(self, Z: torch.Tensor) -> torch.Tensor:
         """Decode latent thoughts back to hidden states.

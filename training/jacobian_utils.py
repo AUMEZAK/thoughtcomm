@@ -72,10 +72,10 @@ def _stochastic_jacobian_l1_vmap(decoder: nn.Module, Z_hat: torch.Tensor,
 
         abs_sum = abs_sum + J_sampled.abs().sum()
 
-    # Match original: mean over (num_sample_rows, batch, n_z) * (n_h / num_sample_rows)
+    # Per-element mean of sampled Jacobian rows (unbiased estimator of full mean)
     actual_rows = min(num_sample_rows, n_h)
     total_elements = actual_rows * batch_size * n_z
-    l1_norm = (abs_sum / total_elements) * (n_h / actual_rows)
+    l1_norm = abs_sum / total_elements
     return l1_norm
 
 
@@ -106,8 +106,8 @@ def _stochastic_jacobian_l1_loop(decoder: nn.Module, Z_hat: torch.Tensor,
     # (num_sample_rows, batch, n_z)
     J_sampled = torch.stack(jacobian_rows, dim=0)
 
-    # L1 norm, averaged over batch, scaled to full Jacobian
-    l1_norm = J_sampled.abs().mean() * (n_h / num_sample_rows)
+    # Per-element mean of sampled Jacobian rows (unbiased estimator of full mean)
+    l1_norm = J_sampled.abs().mean()
     return l1_norm
 
 
