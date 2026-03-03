@@ -1,0 +1,27 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "ae_final_rec_loss": 13806.981689453125,
+  "ae_final_jac_loss": 0.024802113883197308,
+  "ae_final_total_loss": 13806.981937474264,
+  "b_shape": [
+    3072,
+    1024
+  ],
+  "b_sparsity": 0.016027450561523438,
+  "b_nonzero": 3095310,
+  "b_total": 3145728,
+  "agreement_stats": {
+    "total_dims": 1024,
+    "agreement_distribution": {
+      "alpha=0": 0,
+      "alpha=1": 0,
+      "alpha=2": 0,
+      "alpha=3": 1024
+    },
+    "per_agent_relevant": [
+      1024,
+      1024,
+      1024
+    ]
+  }
+}
