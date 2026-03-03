@@ -23,7 +23,7 @@ def get_memory_stats():
 
     allocated = torch.cuda.memory_allocated() / 1024**2
     reserved = torch.cuda.memory_reserved() / 1024**2
-    total = torch.cuda.get_device_properties(0).total_mem / 1024**2
+    total = torch.cuda.get_device_properties(0).total_memory / 1024**2
     free = total - reserved
 
     return {
