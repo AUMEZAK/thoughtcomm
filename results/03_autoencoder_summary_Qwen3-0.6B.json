@@ -1,14 +1,14 @@
 {
   "model": "Qwen/Qwen3-0.6B",
-  "ae_final_rec_loss": 13806.981689453125,
-  "ae_final_jac_loss": 0.024802113883197308,
-  "ae_final_total_loss": 13806.981937474264,
+  "ae_final_rec_loss": 0.012529871426522732,
+  "ae_final_jac_loss": 0.0026214102981612086,
+  "ae_final_total_loss": 0.012556085529504345,
   "b_shape": [
     3072,
     1024
   ],
-  "b_sparsity": 0.016027450561523438,
-  "b_nonzero": 3095310,
+  "b_sparsity": 0.8988122940063477,
+  "b_nonzero": 318309,
   "b_total": 3145728,
   "agreement_stats": {
     "total_dims": 1024,
