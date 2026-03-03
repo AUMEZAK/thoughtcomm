@@ -24,9 +24,16 @@ def load_math_dataset(num_train: int = 500, num_eval: int = 500,
         train_data: list of dicts with 'question', 'answer', 'level', 'type'
         eval_data: list of dicts with same keys
     """
-    from datasets import load_dataset
+    from datasets import load_dataset, concatenate_datasets
 
-    ds = load_dataset("lighteval/MATH", split=split)
+    subsets = [
+        "algebra", "counting_and_probability", "geometry",
+        "intermediate_algebra", "number_theory", "prealgebra", "precalculus"
+    ]
+    ds = concatenate_datasets([
+        load_dataset("EleutherAI/hendrycks_math", s, split=split)
+        for s in subsets
+    ])
 
     # Filter for specified level
     level_str = f"Level {level}"
