@@ -77,6 +77,8 @@ class HiddenStateCollector:
                 print(f"  Checkpoint saved at example {idx + 1}")
                 print_memory_stats("  ")
 
+        if not H_list:
+            raise RuntimeError("No hidden states collected — all examples failed or dataset is empty.")
         H_all = torch.stack(H_list, dim=0)  # (total_samples, n_h)
 
         # Final save
