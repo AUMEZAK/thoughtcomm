@@ -128,14 +128,21 @@ class MultiAgentDebate:
             top_p=self.config.top_p,
             do_sample=True,
             pad_token_id=self.tokenizer.pad_token_id,
+            output_hidden_states=extract_hidden,
+            return_dict_in_generate=extract_hidden,
         )
 
-        generated_ids = outputs[0, input_ids.shape[1]:]
-        response = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
-
-        h_i = None
         if extract_hidden:
-            h_i = extract_last_hidden_state(self.model, outputs)
+            generated_ids = outputs.sequences[0, input_ids.shape[1]:]
+            response = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
+            # outputs.hidden_states: tuple[steps] of tuple[layers] of (batch, 1, hidden)
+            # Take the last generated step, last layer, last (only) token
+            last_step_hidden = outputs.hidden_states[-1]  # tuple of layers
+            h_i = last_step_hidden[-1][0, -1, :].float().cpu()  # (hidden_size,)
+        else:
+            generated_ids = outputs[0, input_ids.shape[1]:]
+            response = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
+            h_i = None
 
         return response, h_i
 
