@@ -1,7 +1,9 @@
 """Training loop for the sparsity-regularized autoencoder."""
 
+import copy
 import torch
 import torch.nn.functional as F
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
@@ -12,13 +14,16 @@ from .jacobian_utils import stochastic_jacobian_l1
 def train_autoencoder(H_train, config, verbose=True):
     """Train the sparsity-regularized autoencoder on concatenated hidden states.
 
+    Includes gradient clipping, cosine LR schedule, and early stopping
+    with best model restoration.
+
     Args:
         H_train: (num_samples, n_h) tensor of concatenated hidden states
         config: ThoughtCommConfig with AE hyperparameters
         verbose: whether to print progress
 
     Returns:
-        model: trained SparsityRegularizedAE
+        model: trained SparsityRegularizedAE (best model by total loss)
         loss_history: dict with keys 'rec', 'jac', 'total' (lists of per-epoch losses)
         norm_stats: dict with 'mean' and 'std' tensors for denormalization
     """
@@ -30,6 +35,9 @@ def train_autoencoder(H_train, config, verbose=True):
     ).to(config.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ae_lr)
+    scheduler = CosineAnnealingLR(
+        optimizer, T_max=config.ae_epochs, eta_min=config.ae_lr_min
+    )
 
     H = H_train.float()
     H_mean = H.mean(dim=0)
@@ -41,6 +49,11 @@ def train_autoencoder(H_train, config, verbose=True):
     loader = DataLoader(dataset, batch_size=config.ae_batch_size, shuffle=True)
 
     loss_history = {"rec": [], "jac": [], "total": []}
+
+    # Early stopping state
+    best_loss = float("inf")
+    best_state_dict = None
+    patience_counter = 0
 
     iterator = tqdm(range(config.ae_epochs), desc="AE Training") if verbose else range(config.ae_epochs)
     for epoch in iterator:
@@ -66,24 +79,55 @@ def train_autoencoder(H_train, config, verbose=True):
 
             optimizer.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(
+                model.parameters(), config.ae_grad_clip
+            )
             optimizer.step()
 
             epoch_rec += L_rec.item()
             epoch_jac += L_jac.item()
             num_batches += 1
 
+        scheduler.step()
+
         avg_rec = epoch_rec / num_batches
         avg_jac = epoch_jac / num_batches
+        avg_total = avg_rec + config.jacobian_l1_weight * avg_jac
         loss_history["rec"].append(avg_rec)
         loss_history["jac"].append(avg_jac)
-        loss_history["total"].append(avg_rec + config.jacobian_l1_weight * avg_jac)
+        loss_history["total"].append(avg_total)
+
+        # Early stopping: track best model
+        if avg_total < best_loss:
+            best_loss = avg_total
+            best_state_dict = copy.deepcopy(model.state_dict())
+            patience_counter = 0
+        else:
+            patience_counter += 1
 
         if verbose and (epoch + 1) % 20 == 0:
+            current_lr = optimizer.param_groups[0]["lr"]
             tqdm.write(
                 f"Epoch {epoch + 1}/{config.ae_epochs}: "
                 f"rec={avg_rec:.6f}, jac={avg_jac:.4f}, "
-                f"total={loss_history['total'][-1]:.6f}"
+                f"total={avg_total:.6f}, lr={current_lr:.2e}, "
+                f"best={best_loss:.6f}, patience={patience_counter}/{config.ae_patience}"
             )
+
+        if patience_counter >= config.ae_patience:
+            if verbose:
+                tqdm.write(
+                    f"Early stopping at epoch {epoch + 1} "
+                    f"(no improvement for {config.ae_patience} epochs). "
+                    f"Best total loss: {best_loss:.6f}"
+                )
+            break
+
+    # Restore best model
+    if best_state_dict is not None:
+        model.load_state_dict(best_state_dict)
+        if verbose:
+            tqdm.write(f"Restored best model (total loss: {best_loss:.6f})")
 
     # Embed norm_stats in model so encode() auto-normalizes raw inputs
     model.set_norm_stats(H_mean, H_std)

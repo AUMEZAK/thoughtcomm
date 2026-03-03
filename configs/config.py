@@ -24,6 +24,9 @@ class ThoughtCommConfig:
     jacobian_l1_weight: float = 0.01  # lambda for ||J||_1
     jacobian_sample_rows: int = 64  # stochastic rows per training step
     jacobian_threshold: float = 0.01  # for binarizing B(J_f)
+    ae_grad_clip: float = 1.0  # gradient clipping max norm
+    ae_lr_min: float = 1e-5  # cosine annealing minimum LR
+    ae_patience: int = 30  # early stopping patience (epochs without improvement)
 
     # --- Prefix Adapter ---
     adapter_hidden: int = 512
