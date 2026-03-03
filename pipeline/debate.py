@@ -102,9 +102,16 @@ class MultiAgentDebate:
         """
         # Tokenize conversation
         # Newer transformers may return BatchEncoding instead of plain tensor
-        result = self.tokenizer.apply_chat_template(
-            conversation, return_tensors="pt", add_generation_prompt=True
-        )
+        # enable_thinking=False disables Qwen3's internal chain-of-thought (<think> tokens)
+        try:
+            result = self.tokenizer.apply_chat_template(
+                conversation, return_tensors="pt", add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            result = self.tokenizer.apply_chat_template(
+                conversation, return_tensors="pt", add_generation_prompt=True,
+            )
         if hasattr(result, 'input_ids'):
             input_ids = result['input_ids'].to(self.device)
         else:

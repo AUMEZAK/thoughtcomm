@@ -40,7 +40,7 @@ class ThoughtCommConfig:
     math_level: int = 3  # MATH difficulty level
 
     # --- Generation ---
-    max_new_tokens: int = 2048
+    max_new_tokens: int = 512
     temperature: float = 0.7
     top_p: float = 0.9
 
