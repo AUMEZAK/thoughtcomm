@@ -1,0 +1,17 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "math_h_shape": [
+    200,
+    3072
+  ],
+  "math_h_mean": -0.11837127804756165,
+  "math_h_std": 4.132617473602295,
+  "math_num_samples": 200,
+  "gsm8k_h_shape": [
+    200,
+    3072
+  ],
+  "gsm8k_h_mean": -0.1705017387866974,
+  "gsm8k_h_std": 4.349765777587891,
+  "gsm8k_num_samples": 200
+}
