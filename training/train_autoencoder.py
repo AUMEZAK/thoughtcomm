@@ -8,7 +8,7 @@ from torch.utils.data import TensorDataset, DataLoader
 from tqdm import tqdm
 
 from models.autoencoder import SparsityRegularizedAE
-from .jacobian_utils import stochastic_jacobian_l1
+from .jacobian_utils import stochastic_jacobian_l1, stochastic_jacobian_group_l1
 
 
 def train_autoencoder(H_train, config, verbose=True):
@@ -55,6 +55,16 @@ def train_autoencoder(H_train, config, verbose=True):
     best_state_dict = None
     patience_counter = 0
 
+    # Regularization type (fixed for entire training)
+    reg_type = getattr(config, "jacobian_reg_type", "l1")
+    if reg_type == "group_l1":
+        jac_weight = getattr(config, "jacobian_group_weight", 1.0)
+    else:
+        jac_weight = config.jacobian_l1_weight
+
+    if verbose:
+        tqdm.write(f"Jacobian reg: {reg_type}, weight={jac_weight}")
+
     iterator = tqdm(range(config.ae_epochs), desc="AE Training") if verbose else range(config.ae_epochs)
     for epoch in iterator:
         epoch_rec = 0.0
@@ -68,14 +78,22 @@ def train_autoencoder(H_train, config, verbose=True):
             # Reconstruction loss (Eq. 7, first term)
             L_rec = F.mse_loss(H_batch, H_rec)
 
-            # Stochastic Jacobian L1 (Eq. 7, second term)
+            # Jacobian regularization (Eq. 7, second term)
             Z_for_jac = model.encode(H_batch)
-            L_jac = stochastic_jacobian_l1(
-                model.decoder, Z_for_jac,
-                num_sample_rows=config.jacobian_sample_rows,
-            )
 
-            loss = L_rec + config.jacobian_l1_weight * L_jac
+            if reg_type == "group_l1":
+                L_jac = stochastic_jacobian_group_l1(
+                    model.decoder, Z_for_jac,
+                    num_agents=config.num_agents,
+                    hidden_size=config.hidden_size,
+                )
+            else:
+                L_jac = stochastic_jacobian_l1(
+                    model.decoder, Z_for_jac,
+                    num_sample_rows=config.jacobian_sample_rows,
+                )
+
+            loss = L_rec + jac_weight * L_jac
 
             optimizer.zero_grad()
             loss.backward()
@@ -92,7 +110,7 @@ def train_autoencoder(H_train, config, verbose=True):
 
         avg_rec = epoch_rec / num_batches
         avg_jac = epoch_jac / num_batches
-        avg_total = avg_rec + config.jacobian_l1_weight * avg_jac
+        avg_total = avg_rec + jac_weight * avg_jac
         loss_history["rec"].append(avg_rec)
         loss_history["jac"].append(avg_jac)
         loss_history["total"].append(avg_total)

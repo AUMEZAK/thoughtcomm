@@ -27,6 +27,8 @@ class ThoughtCommConfig:
     ae_grad_clip: float = 1.0  # gradient clipping max norm
     ae_lr_min: float = 1e-5  # cosine annealing minimum LR
     ae_patience: int = 30  # early stopping patience (epochs without improvement)
+    jacobian_reg_type: str = "group_l1"  # "l1" or "group_l1" (Group Lasso)
+    jacobian_group_weight: float = 1.0  # Group Lasso weight (normalized scale)
 
     # --- Prefix Adapter ---
     adapter_hidden: int = 512

@@ -2,8 +2,9 @@
 
 Provides:
 1. Stochastic Jacobian L1 estimation for training (fast, unbiased)
-2. Full Jacobian computation for B-matrix extraction (post-training)
-3. Binary pattern B(J_f) computation and visualization
+2. Group Lasso (L2,1) Jacobian regularization for block-sparse structure
+3. Full Jacobian computation for B-matrix extraction (post-training)
+4. Binary pattern B(J_f) computation and visualization
 """
 
 import torch
@@ -109,6 +110,122 @@ def _stochastic_jacobian_l1_loop(decoder: nn.Module, Z_hat: torch.Tensor,
     # Per-element mean of sampled Jacobian rows (unbiased estimator of full mean)
     l1_norm = J_sampled.abs().mean()
     return l1_norm
+
+
+def stochastic_jacobian_group_l1(decoder: nn.Module, Z_hat: torch.Tensor,
+                                  num_agents: int, hidden_size: int) -> torch.Tensor:
+    """Compute Group Lasso (L2,1) penalty on the decoder Jacobian.
+
+    Groups Jacobian rows by agent block and computes L2 norm per
+    (agent, latent_dim) pair. This encourages entire agent blocks
+    to be zero, inducing block-sparse structure in B(J_f).
+
+    Penalty = mean_j Σ_k ||J_k[:,:,j]||_F / sqrt(batch * hidden_size)
+
+    Normalized by sqrt(batch * hidden_size) so the penalty scale is
+    comparable to per-element L1.
+
+    Args:
+        decoder: the decoder network f_hat
+        Z_hat: (batch, n_z) encoded latents
+        num_agents: number of agents (K)
+        hidden_size: per-agent hidden state dimension (H)
+
+    Returns:
+        group_l1: scalar Group Lasso penalty, differentiable w.r.t. decoder params
+    """
+    try:
+        return _jacobian_group_l1_vmap(decoder, Z_hat, num_agents, hidden_size)
+    except Exception:
+        return _jacobian_group_l1_loop(decoder, Z_hat, num_agents, hidden_size)
+
+
+def _jacobian_group_l1_vmap(decoder: nn.Module, Z_hat: torch.Tensor,
+                             num_agents: int, hidden_size: int) -> torch.Tensor:
+    """Vectorized Group Lasso via torch.func (fast path)."""
+    from torch.func import jacrev, vmap
+    import math
+
+    Z = Z_hat.detach()
+    batch_size = Z.shape[0]
+    n_z = Z.shape[1]
+    n_h = num_agents * hidden_size
+
+    def single_decode(z):
+        return decoder(z.unsqueeze(0)).squeeze(0)
+
+    jac_fn = vmap(jacrev(single_decode))
+
+    # Sub-batch for memory control
+    max_elements = 32 * 1024 * 1024
+    sub_batch = max(1, min(batch_size, max_elements // max(n_h * n_z, 1)))
+
+    # Accumulate group norms: (num_agents, n_z)
+    group_norms_sum = torch.zeros(num_agents, n_z, device=Z.device)
+
+    for i in range(0, batch_size, sub_batch):
+        Z_sub = Z[i:i + sub_batch]
+        sb = Z_sub.shape[0]
+        J_sub = jac_fn(Z_sub)  # (sb, n_h, n_z)
+
+        # Reshape to (sb, num_agents, hidden_size, n_z)
+        J_agents = J_sub.view(sb, num_agents, hidden_size, n_z)
+
+        # L2 norm per (agent, latent_dim) over (batch, hidden_size)
+        # J_agents[:, k, :, j] has shape (sb, hidden_size)
+        # norm over dims 0 and 2 = (batch, hidden_size) → scalar per (agent, latent_dim)
+        # Use Frobenius norm: sqrt(sum of squares)
+        agent_norms = J_agents.pow(2).sum(dim=(0, 2)).sqrt()  # (num_agents, n_z)
+        group_norms_sum = group_norms_sum + agent_norms
+
+    # Normalize: divide by sqrt(batch * hidden_size) for per-element scale
+    normalizer = math.sqrt(batch_size * hidden_size)
+    group_norms_normalized = group_norms_sum / normalizer
+
+    # Sum over agents, mean over latent dims
+    penalty = group_norms_normalized.sum(dim=0).mean()
+
+    return penalty
+
+
+def _jacobian_group_l1_loop(decoder: nn.Module, Z_hat: torch.Tensor,
+                             num_agents: int, hidden_size: int) -> torch.Tensor:
+    """Loop-based Group Lasso via autograd (fallback)."""
+    import math
+
+    Z = Z_hat.detach().requires_grad_(True)
+    H_rec = decoder(Z)  # (batch, n_h)
+    batch_size = Z.shape[0]
+    n_z = Z.shape[1]
+    n_h = num_agents * hidden_size
+
+    # Compute full Jacobian via row-wise autograd
+    jacobian_rows = []
+    grad_output = torch.zeros_like(H_rec)
+    for idx in range(n_h):
+        grad_output.zero_()
+        grad_output[:, idx] = 1.0
+        grads = torch.autograd.grad(
+            outputs=H_rec, inputs=Z, grad_outputs=grad_output,
+            create_graph=True, retain_graph=True,
+        )[0]  # (batch, n_z)
+        jacobian_rows.append(grads)
+
+    # (n_h, batch, n_z)
+    J_full = torch.stack(jacobian_rows, dim=0)
+    # → (batch, n_h, n_z)
+    J_full = J_full.permute(1, 0, 2)
+    # → (batch, num_agents, hidden_size, n_z)
+    J_agents = J_full.view(batch_size, num_agents, hidden_size, n_z)
+
+    # L2 norm per (agent, latent_dim)
+    agent_norms = J_agents.pow(2).sum(dim=(0, 2)).sqrt()  # (num_agents, n_z)
+
+    normalizer = math.sqrt(batch_size * hidden_size)
+    group_norms_normalized = agent_norms / normalizer
+
+    penalty = group_norms_normalized.sum(dim=0).mean()
+    return penalty
 
 
 def compute_full_jacobian(decoder: nn.Module, Z_hat: torch.Tensor) -> torch.Tensor:
