@@ -101,9 +101,14 @@ class MultiAgentDebate:
             h_i: (hidden_size,) hidden state or None
         """
         # Tokenize conversation
-        input_ids = self.tokenizer.apply_chat_template(
+        # Newer transformers may return BatchEncoding instead of plain tensor
+        result = self.tokenizer.apply_chat_template(
             conversation, return_tensors="pt", add_generation_prompt=True
-        ).to(self.device)
+        )
+        if hasattr(result, 'input_ids'):
+            input_ids = result['input_ids'].to(self.device)
+        else:
+            input_ids = result.to(self.device)
 
         if prefix_embedding is not None:
             response, h_i = self._generate_with_prefix(

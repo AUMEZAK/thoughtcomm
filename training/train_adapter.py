@@ -123,9 +123,13 @@ def train_adapter(model, tokenizer, autoencoder, reweighter, adapter,
 
                 # Build input
                 conversation = [{"role": "user", "content": meta["question"]}]
-                input_ids = tokenizer.apply_chat_template(
+                result = tokenizer.apply_chat_template(
                     conversation, return_tensors="pt", add_generation_prompt=True
-                ).to(device)
+                )
+                if hasattr(result, 'input_ids'):
+                    input_ids = result['input_ids'].to(device)
+                else:
+                    input_ids = result.to(device)
 
                 token_embeds = embed_layer(input_ids)
                 prefix_cast = prefix.to(token_embeds.dtype)

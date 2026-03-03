@@ -138,9 +138,13 @@ def run_single_answer_baseline(model, tokenizer, eval_data, config,
         prompt = INITIAL_PROMPT.format(question=example["question"])
         messages = [{"role": "user", "content": prompt}]
 
-        input_ids = tokenizer.apply_chat_template(
+        result = tokenizer.apply_chat_template(
             messages, return_tensors="pt", add_generation_prompt=True
-        ).to(device)
+        )
+        if hasattr(result, 'input_ids'):
+            input_ids = result['input_ids'].to(device)
+        else:
+            input_ids = result.to(device)
 
         with torch.no_grad():
             outputs = model.generate(
