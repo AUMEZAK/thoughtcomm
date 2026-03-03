@@ -20,6 +20,7 @@ def train_autoencoder(H_train, config, verbose=True):
     Returns:
         model: trained SparsityRegularizedAE
         loss_history: dict with keys 'rec', 'jac', 'total' (lists of per-epoch losses)
+        norm_stats: dict with 'mean' and 'std' tensors for denormalization
     """
     model = SparsityRegularizedAE(
         n_h=config.n_h,
@@ -30,7 +31,13 @@ def train_autoencoder(H_train, config, verbose=True):
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ae_lr)
 
-    dataset = TensorDataset(H_train.float().to(config.device))
+    H = H_train.float()
+    H_mean = H.mean(dim=0)
+    H_std = H.std(dim=0).clamp(min=1e-8)
+    H_normalized = (H - H_mean) / H_std
+    norm_stats = {"mean": H_mean, "std": H_std}
+
+    dataset = TensorDataset(H_normalized.to(config.device))
     loader = DataLoader(dataset, batch_size=config.ae_batch_size, shuffle=True)
 
     loss_history = {"rec": [], "jac": [], "total": []}
@@ -78,15 +85,19 @@ def train_autoencoder(H_train, config, verbose=True):
                 f"total={loss_history['total'][-1]:.6f}"
             )
 
-    return model, loss_history
+    # Embed norm_stats in model so encode() auto-normalizes raw inputs
+    model.set_norm_stats(H_mean, H_std)
+
+    return model, loss_history, norm_stats
 
 
-def train_autoencoder_baseline(H_train, config, verbose=True):
+def train_autoencoder_baseline(H_train, config, verbose=True, norm_stats=None):
     """Train autoencoder WITHOUT Jacobian sparsity (baseline for comparison).
 
     Args:
         H_train: (num_samples, n_h) tensor
         config: ThoughtCommConfig
+        norm_stats: if provided, use these stats for normalization (from train_autoencoder)
 
     Returns:
         model: trained SparsityRegularizedAE (same architecture, no sparsity)
@@ -100,7 +111,18 @@ def train_autoencoder_baseline(H_train, config, verbose=True):
     ).to(config.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=config.ae_lr)
-    dataset = TensorDataset(H_train.float().to(config.device))
+
+    H = H_train.float()
+    if norm_stats is not None:
+        H_mean = norm_stats["mean"]
+        H_std = norm_stats["std"]
+    else:
+        H_mean = H.mean(dim=0)
+        H_std = H.std(dim=0).clamp(min=1e-8)
+        norm_stats = {"mean": H_mean, "std": H_std}
+    H = (H - H_mean) / H_std
+
+    dataset = TensorDataset(H.to(config.device))
     loader = DataLoader(dataset, batch_size=config.ae_batch_size, shuffle=True)
 
     loss_history = {"rec": []}
@@ -123,4 +145,7 @@ def train_autoencoder_baseline(H_train, config, verbose=True):
 
         loss_history["rec"].append(epoch_rec / num_batches)
 
-    return model, loss_history
+    # Embed norm_stats in model so encode() auto-normalizes raw inputs
+    model.set_norm_stats(H_mean, H_std)
+
+    return model, loss_history, norm_stats
