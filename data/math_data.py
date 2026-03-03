@@ -71,7 +71,10 @@ def _extract_boxed(solution: str) -> str:
         if idx == -1:
             return solution.strip().split("\n")[-1]
 
-    start = solution.index("{", idx)
+    try:
+        start = solution.index("{", idx)
+    except ValueError:
+        return solution.strip().split("\n")[-1]
     depth = 1
     i = start + 1
     while i < len(solution) and depth > 0:
