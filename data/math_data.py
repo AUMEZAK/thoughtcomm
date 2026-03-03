@@ -26,7 +26,7 @@ def load_math_dataset(num_train: int = 500, num_eval: int = 500,
     """
     from datasets import load_dataset
 
-    ds = load_dataset("hendrycks/competition_math", split=split)
+    ds = load_dataset("lighteval/MATH", split=split)
 
     # Filter for specified level
     level_str = f"Level {level}"
