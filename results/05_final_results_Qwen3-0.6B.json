@@ -1,0 +1,39 @@
+{
+  "model": "Qwen/Qwen3-0.6B",
+  "single_answer": {
+    "math_acc": 5.0,
+    "gsm8k_acc": 48.0
+  },
+  "debate_only": {
+    "math_acc_per_agent": [
+      50.0,
+      52.0,
+      51.0
+    ],
+    "math_acc_avg": 51.0,
+    "math_consensus": 65.0,
+    "gsm8k_acc_per_agent": [
+      67.0,
+      68.0,
+      68.0
+    ],
+    "gsm8k_acc_avg": 67.66666666666667,
+    "gsm8k_consensus": 72.0
+  },
+  "thoughtcomm": {
+    "math_acc_per_agent": [
+      51.0,
+      55.0,
+      51.0
+    ],
+    "math_acc_avg": 52.333333333333336,
+    "math_consensus": 62.0,
+    "gsm8k_acc_per_agent": [
+      64.0,
+      63.0,
+      63.0
+    ],
+    "gsm8k_acc_avg": 63.333333333333336,
+    "gsm8k_consensus": 74.0
+  }
+}
