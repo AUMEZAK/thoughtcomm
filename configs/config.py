@@ -40,8 +40,8 @@ class ThoughtCommConfig:
     max_gen_tokens_adapter: int = 50  # short continuation for adapter training
 
     # --- Data ---
-    num_train: int = 100
-    num_eval: int = 100
+    num_train: int = 500
+    num_eval: int = 500
     math_level: int = 3  # MATH difficulty level
 
     # --- Generation ---

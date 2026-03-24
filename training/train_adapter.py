@@ -123,9 +123,15 @@ def train_adapter(model, tokenizer, autoencoder, reweighter, adapter,
 
                 # Build input
                 conversation = [{"role": "user", "content": meta["question"]}]
-                result = tokenizer.apply_chat_template(
-                    conversation, return_tensors="pt", add_generation_prompt=True
-                )
+                try:
+                    result = tokenizer.apply_chat_template(
+                        conversation, return_tensors="pt", add_generation_prompt=True,
+                        enable_thinking=False,
+                    )
+                except TypeError:
+                    result = tokenizer.apply_chat_template(
+                        conversation, return_tensors="pt", add_generation_prompt=True,
+                    )
                 if hasattr(result, 'input_ids'):
                     input_ids = result['input_ids'].to(device)
                 else:
@@ -160,10 +166,10 @@ def train_adapter(model, tokenizer, autoencoder, reweighter, adapter,
                     shift_labels[:, :min_len].reshape(-1),
                 )
 
-                # Cosine similarity loss
-                # Approximate generated token embeddings from argmax of logits
-                gen_ids = logits[:, prefix_and_input_len:prefix_and_input_len + min_len, :].argmax(dim=-1)
-                gen_embeds_mean = embed_layer(gen_ids).mean(dim=1).float()  # (1, d)
+                # Cosine similarity loss (differentiable via softmax weighting)
+                gen_logits = logits[:, prefix_and_input_len:prefix_and_input_len + min_len, :]
+                gen_probs = F.softmax(gen_logits / 0.1, dim=-1)  # sharp but differentiable
+                gen_embeds_mean = (gen_probs @ embed_layer.weight).mean(dim=1).float()  # (1, d)
 
                 ref_mean = ref_embeddings[sample_idx][agent_idx].unsqueeze(0).to(device)
                 cosine_loss = 1.0 - F.cosine_similarity(gen_embeds_mean, ref_mean, dim=-1).mean()

@@ -190,7 +190,7 @@ class MultiAgentDebate:
             # We need to reconstruct the full sequence with prefix for hidden state
             # Use the combined embeddings approach
             gen_embeds = embed_layer(outputs)
-            full_embeds = torch.cat([prefix, gen_embeds], dim=1)
+            full_embeds = torch.cat([prefix, token_embeds, gen_embeds], dim=1)
             full_mask = torch.ones(
                 1, full_embeds.shape[1], dtype=torch.long, device=self.device
             )

@@ -138,9 +138,15 @@ def run_single_answer_baseline(model, tokenizer, eval_data, config,
         prompt = INITIAL_PROMPT.format(question=example["question"])
         messages = [{"role": "user", "content": prompt}]
 
-        result = tokenizer.apply_chat_template(
-            messages, return_tensors="pt", add_generation_prompt=True
-        )
+        try:
+            result = tokenizer.apply_chat_template(
+                messages, return_tensors="pt", add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            result = tokenizer.apply_chat_template(
+                messages, return_tensors="pt", add_generation_prompt=True,
+            )
         if hasattr(result, 'input_ids'):
             input_ids = result['input_ids'].to(device)
         else:
