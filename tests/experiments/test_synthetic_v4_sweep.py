@@ -71,24 +71,24 @@ class SweepAE(nn.Module):
 def train_ae_synthetic(ae, X, lam=0.01, lr=1e-3, epochs=200, batch_size=128,
                        jac_sample_rows=64, verbose=False):
     """Train AE with Jacobian L1 on synthetic data. Returns trained AE."""
-    device = 'cpu'
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
     ae = ae.to(device)
     optimizer = torch.optim.Adam(ae.parameters(), lr=lr)
 
     # Normalize
-    X_mean = X.mean(0)
-    X_std = X.std(0).clamp(min=1e-8)
-    X_norm = (X - X_mean) / X_std
+    X_mean = X.mean(0).to(device)
+    X_std = X.std(0).clamp(min=1e-8).to(device)
+    X_norm = ((X.to(device) - X_mean) / X_std)
 
     n = X_norm.shape[0]
 
     for epoch in range(epochs):
-        perm = torch.randperm(n)
+        perm = torch.randperm(n, device=device)
         total_rec, total_jac = 0.0, 0.0
         n_batches = 0
 
         for i in range(0, n, batch_size):
-            batch = X_norm[perm[i:i + batch_size]].to(device)
+            batch = X_norm[perm[i:i + batch_size]]
             if batch.shape[0] < 2:
                 continue
 
@@ -128,19 +128,25 @@ def train_ae_synthetic(ae, X, lam=0.01, lr=1e-3, epochs=200, batch_size=128,
             n_batches += 1
 
         if verbose and (epoch + 1) % 50 == 0:
-            print(f"  Epoch {epoch+1}: rec={total_rec/n_batches:.4f}, jac={total_jac/n_batches:.4f}")
+            print(f"  Epoch {epoch+1}/{epochs}: rec={total_rec/n_batches:.4f}, jac={total_jac/n_batches:.4f}")
+        elif not verbose and (epoch + 1) % 100 == 0:
+            print(f"    ep{epoch+1}/{epochs}", end="", flush=True)
 
-    return ae, X_mean, X_std
+    if not verbose:
+        print()  # newline after progress dots
+    return ae, X_mean.cpu(), X_std.cpu()
 
 
 def evaluate_mcc(ae, X, Z_true, X_mean, X_std):
     """Compute MCC between estimated and true latents."""
+    device = next(ae.parameters()).device
     ae.eval()
     with torch.no_grad():
-        X_norm = (X - X_mean) / X_std
+        X_d = X.to(device)
+        X_norm = (X_d - X_mean.to(device)) / X_std.to(device)
         Z_hat = ae.encode(X_norm)
 
-    Z_hat_np = Z_hat.numpy()
+    Z_hat_np = Z_hat.cpu().numpy()
     Z_true_np = Z_true.numpy()
 
     mcc, perm = compute_mcc_fast(Z_true_np, Z_hat_np)
@@ -204,6 +210,12 @@ def run_single_experiment(config):
 if __name__ == '__main__':
     RESULTS_DIR = os.path.join(os.path.dirname(__file__), '..', '..', 'results')
     os.makedirs(RESULTS_DIR, exist_ok=True)
+
+    device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    print(f"Device: {device}")
+    if device == 'cuda':
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print()
 
     # Fixed author conditions
     BASE = dict(
