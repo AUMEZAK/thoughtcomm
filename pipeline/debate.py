@@ -143,9 +143,11 @@ class MultiAgentDebate:
             generated_ids = outputs.sequences[0, input_ids.shape[1]:]
             response = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
             # outputs.hidden_states: tuple[steps] of tuple[layers] of (batch, 1, hidden)
-            # Take the last generated step, last layer, last (only) token
+            # Take the last generated step, target layer (2/3 depth), last (only) token
             last_step_hidden = outputs.hidden_states[-1]  # tuple of layers
-            h_i = last_step_hidden[-1][0, -1, :].float().cpu()  # (hidden_size,)
+            num_layers = len(last_step_hidden) - 1  # exclude embedding layer
+            target_layer = self.config.target_layer_index(num_layers)
+            h_i = last_step_hidden[target_layer][0, -1, :].float().cpu()
         else:
             generated_ids = outputs[0, input_ids.shape[1]:]
             response = self.tokenizer.decode(generated_ids, skip_special_tokens=True)
@@ -199,7 +201,8 @@ class MultiAgentDebate:
                 attention_mask=full_mask,
                 output_hidden_states=True,
             )
-            last_layer = fwd_out.hidden_states[-1]
-            h_i = last_layer[0, -1, :].float().cpu()
+            num_layers = len(fwd_out.hidden_states) - 1  # exclude embedding
+            target_layer = self.config.target_layer_index(num_layers)
+            h_i = fwd_out.hidden_states[target_layer][0, -1, :].float().cpu()
 
         return response, h_i

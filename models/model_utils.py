@@ -34,26 +34,36 @@ def load_model_and_tokenizer(model_name, dtype="bfloat16", device_map="auto"):
 
 
 @torch.no_grad()
-def extract_last_hidden_state(model, input_ids, attention_mask=None):
-    """Extract the last-layer hidden state at the last token position.
+def extract_hidden_state(model, input_ids, attention_mask=None, layer_fraction=0.667):
+    """Extract hidden state at specified depth and last token position.
 
-    This corresponds to H_t^(i) in the paper: the model state of agent i,
-    which is the representation of the last generated token at the final layer.
+    The paper authors extract from 2/3 model depth (OpenReview Rebuttal),
+    not the final layer. Middle layers contain richer semantic representations.
 
     Args:
         model: HF causal LM
         input_ids: (1, seq_len) token IDs (full sequence including generated tokens)
         attention_mask: (1, seq_len) or None
+        layer_fraction: fraction of model depth (0.667 = 2/3 depth, 1.0 = last layer)
 
     Returns:
-        h: (hidden_size,) last-layer, last-token hidden state (float32, CPU)
+        h: (hidden_size,) hidden state (float32, CPU)
     """
     outputs = model(
         input_ids=input_ids,
         attention_mask=attention_mask,
         output_hidden_states=True,
     )
-    # outputs.hidden_states: tuple of (num_layers+1,) tensors, each (batch, seq_len, hidden)
-    last_layer = outputs.hidden_states[-1]  # (1, seq_len, hidden_size)
-    h = last_layer[0, -1, :].float().cpu()   # (hidden_size,)
+    # outputs.hidden_states: tuple of (num_layers+1,) tensors
+    # Index 0 = embedding layer output, 1..N = transformer layer outputs
+    num_layers = len(outputs.hidden_states) - 1  # exclude embedding layer
+    target_layer = min(int(num_layers * layer_fraction), num_layers)
+
+    h = outputs.hidden_states[target_layer][0, -1, :].float().cpu()
     return h
+
+
+# Backward compatibility alias
+def extract_last_hidden_state(model, input_ids, attention_mask=None):
+    """Legacy wrapper — extracts from last layer."""
+    return extract_hidden_state(model, input_ids, attention_mask, layer_fraction=1.0)

@@ -13,14 +13,15 @@ class ThoughtCommConfig:
     hidden_size: int = 1024  # per-agent hidden dim (Qwen=1024, Phi-4=3072)
     num_agents: int = 3
     num_rounds: int = 2
+    hidden_state_layer_fraction: float = 0.667  # 2/3 depth (author Rebuttal)
 
     # --- Autoencoder ---
     n_z: int = 1024  # latent thought dimension
     ae_hidden: int = 2048  # AE hidden layer width
     ae_num_layers: int = 3  # encoder/decoder depth
-    ae_lr: float = 1e-3
+    ae_lr: float = 1e-5  # author Rebuttal (was 1e-3)
     ae_epochs: int = 200
-    ae_batch_size: int = 64
+    ae_batch_size: int = 128  # author Rebuttal (was 64)
     jacobian_l1_weight: float = 0.01  # lambda for ||J||_1
     jacobian_sample_rows: int = 64  # stochastic rows per training step
     jacobian_threshold: float = 0.01  # for binarizing B(J_f)
@@ -57,6 +58,17 @@ class ThoughtCommConfig:
     # --- Paths ---
     save_dir: str = "/content/drive/MyDrive/thoughtcomm_checkpoints/"
     local_save_dir: str = "./checkpoints/"
+
+    def target_layer_index(self, num_layers: int) -> int:
+        """Get the target hidden layer index for state extraction.
+
+        Args:
+            num_layers: total number of transformer layers in the model
+        Returns:
+            layer index (0-based, excluding embedding layer)
+        """
+        idx = int(num_layers * self.hidden_state_layer_fraction)
+        return min(idx, num_layers)  # safety clamp
 
     @property
     def n_h(self) -> int:
