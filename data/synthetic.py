@@ -76,7 +76,8 @@ class StructuredInvertibleMLP(nn.Module):
         return torch.cat([x_a, x_b], dim=1)
 
 
-def generate_synthetic_data(dim=128, num_samples=10000, seed=42, num_layers=1):
+def generate_synthetic_data(dim=128, num_samples=10000, seed=42, num_layers=1,
+                            shared_fraction=1/3):
     """Generate synthetic data with known latent structure.
 
     Args:
@@ -84,6 +85,9 @@ def generate_synthetic_data(dim=128, num_samples=10000, seed=42, num_layers=1):
         num_samples: number of data points
         seed: random seed
         num_layers: number of layers in mixing MLP (1=linear, 3=nonlinear)
+        shared_fraction: fraction of latent dims that are shared (controls B_true sparsity).
+            Default 1/3 gives ~66% nonzero in B_true.
+            Smaller values (e.g. 0.1) give sparser B_true.
 
     Returns:
         X: (num_samples, dim) observed variables
@@ -95,10 +99,11 @@ def generate_synthetic_data(dim=128, num_samples=10000, seed=42, num_layers=1):
     torch.manual_seed(seed)
     np.random.seed(seed)
 
-    # Split dim into 3 roughly equal groups
-    n_private_a = dim // 3
-    n_shared = dim // 3
-    n_private_b = dim - n_private_a - n_shared
+    # Split dim into 3 groups based on shared_fraction
+    n_shared = max(1, int(dim * shared_fraction))
+    n_private_total = dim - n_shared
+    n_private_a = n_private_total // 2
+    n_private_b = n_private_total - n_private_a
 
     # Observed dimensions split in half
     n_obs_a = dim // 2
